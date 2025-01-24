@@ -29,10 +29,9 @@ pub enum Scope {
 }
 
 /// Possible values for alias dereferencing during search.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum DerefAliases {
     /// Never dereference.
-    #[default]
     Never = 0,
     /// Dereference while retrieving objects according to search scope.
     Searching = 1,
@@ -40,6 +39,12 @@ pub enum DerefAliases {
     Finding = 2,
     /// Always dereference.
     Always = 3,
+}
+
+impl Default for DerefAliases {
+    fn default() -> Self {
+        DerefAliases::Never
+    }
 }
 
 #[derive(Debug)]
@@ -128,7 +133,7 @@ impl SearchOptions {
 /// attribute can contain unconstrained binary strings, the conversion may fail. In that case,
 /// the attribute and all its values will be in the `bin_attrs` hashmap. Since it's
 /// possible that a particular set of values for a binary attribute _could_ be
-/// converted into UTF-8 `String`s, the presence of such an attribute in the result
+/// converted into UTF-8 `String`s, the presence of of such attribute in the result
 /// entry should be checked for both in `attrs` and `bin_atrrs`.
 #[derive(Debug, Clone)]
 pub struct SearchEntry {
@@ -217,8 +222,6 @@ impl SearchEntry {
     }
 }
 
-// Not really, IMO
-#[allow(rustdoc::invalid_html_tags)]
 /// Possible states of a `SearchStream`.
 ///
 /// ## `SearchStream` call/state conceptual diagram
@@ -738,7 +741,7 @@ where
         let adapter = self.adapters[self.ax].clone();
         let mut adapter = adapter.lock().await;
         self.ax += 1;
-        let res = adapter.start(self, base, scope, filter, attrs).await;
+        let res = (&mut adapter).start(self, base, scope, filter, attrs).await;
         self.ax -= 1;
         if res.is_err() {
             self.state = StreamState::Error;
@@ -765,7 +768,7 @@ where
         let adapter = self.adapters[self.ax].clone();
         let mut adapter = adapter.lock().await;
         self.ax += 1;
-        let res = adapter.next(self).await;
+        let res = (&mut adapter).next(self).await;
         self.ax -= 1;
         match res {
             Ok(None) if self.ax == 0 => self.state = StreamState::Done,
@@ -800,7 +803,7 @@ where
         let adapter = self.adapters[self.ax].clone();
         let mut adapter = adapter.lock().await;
         self.ax += 1;
-        let res = adapter.finish(self).await;
+        let res = (&mut adapter).finish(self).await;
         self.ax -= 1;
         res
     }

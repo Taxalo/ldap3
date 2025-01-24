@@ -1,5 +1,3 @@
-use std::convert::TryFrom;
-
 use common::TagClass;
 use common::TagStructure;
 use structure::{StructureTag, PL};
@@ -8,7 +6,6 @@ use nom;
 use nom::bits::streaming as bits;
 use nom::bytes::streaming::take;
 use nom::combinator::map_opt;
-use nom::error::{Error, ErrorKind, ParseError};
 use nom::number::streaming as number;
 use nom::sequence::tuple;
 use nom::{IResult, InputLength, Needed};
@@ -29,19 +26,15 @@ fn parse_type_header(i: &[u8]) -> nom::IResult<&[u8], (TagClass, TagStructure, u
     nom::bits(tuple((class_bits, pc_bit, tagnr_bits)))(i)
 }
 
-fn parse_length(i: &[u8]) -> nom::IResult<&[u8], usize> {
+fn parse_length(i: &[u8]) -> nom::IResult<&[u8], u64> {
     let (i, len) = number::be_u8(i)?;
     if len < 128 {
-        Ok((i, len as usize))
+        Ok((i, len as u64))
     } else {
         let len = len - 128;
         let (i, b) = take(len)(i)?;
         let (_, len) = parse_uint(b)?;
-        Ok((
-            i,
-            usize::try_from(len)
-                .map_err(|_| nom::Err::Failure(Error::from_error_kind(i, ErrorKind::TooLarge)))?,
-        ))
+        Ok((i, len))
     }
 }
 
@@ -92,7 +85,6 @@ impl Parser {
     pub fn new() -> Self {
         Self
     }
-
     pub fn parse<'a>(
         &mut self,
         input: &'a [u8],
@@ -101,12 +93,6 @@ impl Parser {
             return Err(nom::Err::Incomplete(Needed::Unknown));
         };
         parse_tag(input)
-    }
-}
-
-impl Default for Parser {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

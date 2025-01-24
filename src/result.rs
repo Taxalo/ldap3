@@ -42,10 +42,6 @@ pub enum LdapError {
     #[error("the port must be empty in the ldapi scheme")]
     PortInUnixPath,
 
-    /// The existing stream in `LdapConnectionSettings` doesn't match the URL.
-    #[error("the stream type in LdapConnSettings does not match the URL")]
-    MismatchedStreamType,
-
     /// Encapsulated I/O error.
     #[error("I/O error: {source}")]
     Io {
@@ -128,7 +124,7 @@ pub enum LdapError {
     #[error("rustls DNS error: {source}")]
     DNSName {
         #[from]
-        source: rustls::pki_types::InvalidDnsNameError,
+        source: rustls::client::InvalidDnsNameError,
     },
 
     /// LDAP operation result with an error return code.
@@ -154,7 +150,7 @@ pub enum LdapError {
     #[error("invalid scope string in LDAP URL: {0}")]
     InvalidScopeString(String),
 
-    /// Unrecognized LDAP URL extension marked as critical.
+    /// Unreconized LDAP URL extension marked as critical.
     #[error("unrecognized critical LDAP URL extension: {0}")]
     UnrecognizedCriticalExtension(String),
 
@@ -167,19 +163,6 @@ pub enum LdapError {
     /// No token received from GSSAPI acceptor.
     #[error("no token received from acceptor")]
     NoGssapiToken,
-
-    #[cfg(feature = "ntlm")]
-    /// SSPI error in NTLM processing.
-    #[error("SSPI NTLM error: {source}")]
-    SSPIError {
-        #[from]
-        source: sspi::Error,
-    },
-
-    #[cfg(feature = "ntlm")]
-    /// No CHALLENGE token received in NTLM exchange.
-    #[error("no CHALLENGE token received in NTLM exchange")]
-    NoNtlmChallengeToken,
 }
 
 impl From<LdapError> for io::Error {

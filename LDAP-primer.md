@@ -41,7 +41,7 @@ effectively. The principal difficulty with gaining that knowledge lies
 in learning a sizeable set of interrelated concepts using rather alien
 terminology, stemming from LDAP's roots in the X.500 standardization
 effort. The IETF/ISO standard wars of the mid- to late 1980s are
-now forgotten, but one can glimpse some of the reasons for the IETF's
+now forgotten, but one can glimpse some of the reasons for internet's
 decisive victory by perusing any available X.500 document and noting
 the impenetrable text combined with a jungle of references to other
 such documents.
@@ -52,7 +52,7 @@ the minimum of necessary terminology to explain any issue. For a deeper
 understanding, familiarity with the original specifications is still
 immensely useful, and the interested reader shouldn't shy away even from
 the ISO/ITU-T standards. X.501 (The Directory: Models), 1993 edition, is
-[available online](https://www.itu.int/rec/T-REC-X.501-199311-S/en).
+[readily available online](https://www.itu.int/rec/T-REC-X.501-199311-S/en).
 If one makes peace with the style, it's evident that many LDAP concepts are
 a simplified extrapolation of those in X.501.
 
@@ -84,7 +84,7 @@ Still keeping it in JSON:
         "userPassword": "secret"
     }
 
-LDAP uses a different textual format, called LDIF (LDAP Data Interchange
+LDAP represents data in a different format, called LDIF (LDAP Data Interchange
 Format.) Directly translating the above JSON to LDIF gives:
 
     uid: john.doe
@@ -101,21 +101,17 @@ look like this:
 
     dn: uid=john.doe,ou=People,dc=example,dc=com
     objectClass: top
-    objectClass: person
-    objectClass: organizationalPerson
     objectClass: inetOrgPerson
     uid: john.doe
     cn: John Doe
     sn: Doe
     userPassword: secret
 
-The `dn` line will be explained in the next section. Here, just note that
-there are multiple lines starting with "objectClass". That's because most
-LDAP attributes can have multiple values, which is represented in LDIF as separate
-lines with the same attribute name. Attribute values in an entry form
-a mathematical set: there must not be any duplicate values for a given attribute.
-
-Attributes cannot exist without values; there's no concept in LDAP of a `null` value.
+The `dn` attribute will be explained in the next section. Here, just note that
+there are multiple lines starting with "objectClass". That's because certain
+LDAP attributes can be multi-valued, which is represented in LDIF as separate
+lines with the same attribute name. Attribute values in an entry form a set:
+there must not be any duplicate values for a given attribute.
 
 Attribute names can be more complicated than described here, and more will be
 said in a later section.
@@ -123,16 +119,13 @@ said in a later section.
 ## 2.2. Entry naming and organization
 
 Entries in an LDAP database are logically organized as a tree, called the __directory
-information tree__ (DIT), and every entry has a property describing its position
-in the tree. The property is named `dn` for "distinguished name", and is unique
-for an entry. Despite using the attribute syntax in the LDIF, it is *not* one of
-the entry attributes. Let's repeat the full entry from the previous section
-and highlight the naming attributes:
+information tree__ (DIT), and every entry has an attribute describing its position
+in the tree. The attribute is named `dn` for "distinguished name", and is unique
+for an entry. Let's repeat the full entry from the previous section and highlight
+the naming attributes:
 
 <pre><code><b>dn</b>: uid=john.doe,ou=People,<i>dc=example,dc=com</i>
 objectClass: top
-objectClass: person
-objectClass: organizationalPerson
 objectClass: inetOrgPerson
 <b>uid</b>: john.doe
 cn: John Doe
@@ -143,7 +136,7 @@ userPassword: secret
 A __distinguished name__ (DN) is a sequence of components describing the path
 through the logical tree from its root to the entry itself. In the LDIF value
 representation, the components are comma-separated and written left-to-right
-from the entry to the root. (In the above DN, the component closest to the
+from the leaf to the root. (In the above DN, the component closest to the
 root is "dc=com".) Each component is called a __relative distinguished name__
 (RDN), and (in the simplest case, covered here) consists of a single attribute
 name and a value. The attribute and the value of the leftmost RDN, which names
@@ -164,9 +157,9 @@ to the domain __example.com__. In a DIT organized with such a mapping, all entri
 are at or below the domain, which is then called the __suffix__ or __naming context__.
 A single DIT can contain multiple naming contexts.
 
-There is a special entry at the very root of the DIT. It has an empty DN (i.e., `""`)
+There is a special entry at the very root of the DIT. It has an empty DN
 and is called the __root DSE__ (DSA Specific Entry; "DSA" stands for "directory
-system agent", another name for the directory server.) It's used to store basic
+service agent", another name for the directory server.) It's used to store basic
 configuration and capability data about the directory server.
 
 ## 2.3. Entry structure and schemas
@@ -180,8 +173,8 @@ a hierarchy, in which all structural classes are ultimately derived from the
 _top_ class. That's why there will always be an `objectClass` attribute with
 that value in an entry.
 
-In the John Doe entry used as an example, the (structural) class _inetOrgPerson_
-is derived from _organizationalPerson_, in turn a descendant of  _person_, which mandates
+In the John Doe entry used as an example, the class _inetOrgPerson_ is derived
+from _organizationalPerson_, in turn a descendant of  _person_, which mandates
 the `cn` and `sn` attributes. Furthermore, `userPassword` is an optional attribute
 of _person_, while `uid` is an optional attribute of _inetOrgPerson_, although
 it's mandatory in this entry since it's a naming attribute.
@@ -237,7 +230,7 @@ and is discouraged in current usage. There is a de-facto standard for straight T
 connections, where the server listens on port 636. It's supported by everyone, but for
 some reason was never standardized, and it's doubtful that it will ever be.
 
-LDAP has a family of URL schemes for specifying connection
+LDAP has a family of URL schemes which are regularly used for specifying connection
 and search parameters. In the most basic usage, the scheme part is __ldap__ for clear
 connections, __ldaps__ for unconditional TLS, and __ldapi__ for UNIX domain sockets
 (definitely nonstandard but widely available on Unix-like systems.) The host part of
@@ -255,10 +248,6 @@ The bind DN plays the role of username. The precise form of that DN depends on s
 configuration. It should be obvious that sending the password should only be done over
 a TLS-protected connection.
 
-Once a client has a connection, it may issue multiple operations to the server. The client
-can do this asynchronously, that is it does not have to wait for one operation to complete
-before issuing another operation. LDAP connections are often long lived.
-
 When the client is finished, it may use the __unbind__ operation or simply drop
 the connection. The name "unbind" is slightly misleading, suggesting the opposite
 of "bind" while keeping the connection open; this is not the case, since unbinding shuts
@@ -271,10 +260,10 @@ The only way to retrieve one or more entries via LDAP is to use the __search__ o
 It has a plethora of parameters and options, of which the following four are usually
 all it's necessary to provide:
 
-1. The _search base_, the starting point in the DIT for the operation. It must
+1. The _search base_, which is the starting point in the DIT for the operation. It must
    lie within a naming context; one exception is the search for the root DSE.
 
-2. The _scope_, which bounds the number of entries that the operation will consider. It
+2. The _scope_, which bounds the number of entries which the operation will consider. It
    can have the values _base_, meaning only the entry named as the search base; _one_ (for
    "one level"), which means all entries on the single level immediately below the
    search base, but excluding the base itself; and _sub_ (for "subtree"), containing
@@ -283,17 +272,16 @@ all it's necessary to provide:
 3. The _filter_, an expression computed for all candidate entries, selecting those for which
    it evaluates to true. An empty filter is syntactically invalid, although some LDAP tools
    automatically substitute it with `(objectClass=*)`, meaning "an entry containing
-   a non-empty `objectClass` attribute," that is, all of them.
+   a non-empty `objectClass` attribute," which is all of them.
        
 4. The list of _attributes_ to retrieve from the matching entries. If none are specified, only
    the matching entry DNs are returned. The special name `*` means "all attributes," or more
    precisely, all _user_ attributes, since there is an additional set of __operational attributes__
    in each entry, maintained by the directory itself and not modifiable by the user. The set of
-   all operational attributes is requested by the special name `+`. Most clients will only
-   request the attributes that they really need from the server.
+   all operational attributes is requested by the special name `+`.
 
 The search operation, like all but two other LDAP operations, returns a result structure, one of
-whose elements is a numeric result code. Zero signifies success, while most non-zero values
+whose elements is a numeric result code. Zero signifes success, while most non-zero values
 are errors.
 
 Filters are arguably the most important components of search requests, since they enable finding
@@ -320,25 +308,20 @@ changed to account for both:
     (|(uid=john.doe)(mail=john.doe))
 
 The filter would match an entry which has either `uid` or `mail` with the value "john.doe".
-In this case, only the `uid` term would match. If the user entered "john.doe@example.com", the
+In this case, the `uid` term would match. If the user entered "john.doe@example.com", the
 resulting filter would be:
 
     (|(uid=john.doe@example.com)(mail=john.doe@example.com))
 
-This filter would match the same entry, but in this case only the `mail` term would evaluate
+This filter would match the same entry, but in this case the `mail` term would evaluate
 to true.
-
-The above examples all use __equality__ filters. LDAP also supports other kinds of filters, of
-which the most useful are __substrings__, for partial string matches, and __present__, for
-matching the entries where an attribute exists irrespective of its value. Filters can be
-combined with __or__ (as above), __and__ or __not__.
 
 ## 3.3. Other LDAP operations
 
 LDAP provides the full set of operations for maintaining the DIT: adding, modifying and deleting
 entries, the analogues of INSERT, UPDATE and DELETE operations on a relational database. A notable
-difference is that LDAP operations only work on a single entry. The protocol guarantees that all
-modifications of an entry performed in a single operation will be atomic: either all of them
+difference is that LDAP changes don't operate in bulk, but on a single entry. The protocol guarantees
+that all modifications of an entry performed in a single operation will be atomic: either all of them
 are visible, or none. The guarantee doesn't extend to a series of modifications or other operations
 that change the DIT.
 
@@ -355,28 +338,3 @@ exist in the entry, so renaming an entry to a RDN that is not already present wo
 operations: one to add a new value and one to perform a renaming. To account for this situation,
 __modify DN__ will add the new naming attribute and value to the renamed entry automatically,
 and will also optionally delete the previous naming attribute-value pair.
-
-## 3.4. Extensions
-
-LDAP operations can be extended in two main ways, using __controls__ and __extended operations__.
-Some extensions are standardized, but a lot of them are tied to specific directory service
-implementations.
-
-An extended operation is simply another operation, like Bind or Search, that is not part of
-the core LDAP specifications. LDAP servers often support at least three extended operations:
-__StartTLS__ (mentioned in Section 3.1), __WhoAmI__, and __PasswordModify__.
-
-A control is a named structure, possibly with additional data, attached to an LDAP operation,
-which is there to change the operation's behavior in some way. For example, the __Assertion__
-control can be used with a Modify operation to indicate that the server should only modify the
-entry if the filter attached to the control is true for the entry. An LDAP operation may have
-multiple controls attached, with the caveat that the combination must be semantically valid.
-
-Another example is the __SubtreeDelete__ control which is used with the Delete operation to delete
-an entire subtree of entries from the DIT.
-
-Each control used has to indicate to the server if the control is "critical" to performing the
-operation, or not. If you include a critical control that the server does not support in some way,
-the server will fail the entire operation.
-
-Sometimes operation responses contain controls returned from the server.

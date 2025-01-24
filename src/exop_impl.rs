@@ -10,9 +10,6 @@ pub use self::starttls::StartTLS;
 mod passmod;
 pub use self::passmod::{PasswordModify, PasswordModifyResp};
 
-mod txn;
-pub use self::txn::{EndTxn, EndTxnResp, StartTxn, StartTxnResp};
-
 /// Generic extended operation.
 ///
 /// Since the same struct can be used both for requests and responses,

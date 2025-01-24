@@ -25,7 +25,6 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::time;
 
 /// SASL bind exchange wrapper.
-#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub(crate) struct SaslCreds(pub Option<Vec<u8>>);
 
@@ -83,7 +82,7 @@ pub struct Ldap {
     pub(crate) sasl_param: Arc<RwLock<(bool, u32)>>, // sasl_wrap, sasl_max_send
     #[cfg(feature = "gssapi")]
     pub(crate) client_ctx: Arc<Mutex<Option<ClientCtx>>>,
-    #[cfg(any(feature = "gssapi", feature = "ntlm"))]
+    #[cfg(feature = "gssapi")]
     pub(crate) tls_endpoint_token: Arc<Option<Vec<u8>>>,
     pub(crate) has_tls: bool,
     pub timeout: Option<Duration>,
@@ -102,7 +101,7 @@ impl Clone for Ldap {
             sasl_param: self.sasl_param.clone(),
             #[cfg(feature = "gssapi")]
             client_ctx: self.client_ctx.clone(),
-            #[cfg(any(feature = "gssapi", feature = "ntlm"))]
+            #[cfg(feature = "gssapi")]
             tls_endpoint_token: self.tls_endpoint_token.clone(),
             has_tls: self.has_tls,
             last_id: 0,
@@ -363,9 +362,6 @@ impl Ldap {
                 buf[0] = 0;
                 let send_max_size =
                     u32::from_be_bytes((&buf[..]).try_into().expect("send max size"));
-                if send_max_size == 0 {
-                    warn!("got zero send_max_size, will be treated as unlimited");
-                }
                 let mut sasl_param = self.sasl_param.write().expect("sasl param");
                 sasl_param.0 = true;
                 sasl_param.1 = send_max_size;
@@ -374,92 +370,6 @@ impl Ldap {
             client_opt.replace(client_ctx);
         }
         Ok(res)
-    }
-
-    #[cfg_attr(docsrs, doc(cfg(feature = "ntlm")))]
-    #[cfg(feature = "ntlm")]
-    /// Do an SASL GSS-SPNEGO bind with an NTLMSSP exchange on the connection. Username
-    /// and password must be provided, since the method is incapable of retrieving the
-    /// credentials associated with the login session (which would only work on Windows
-    /// anyway.) To specify the domain, incorporate it into the username, using the
-    /// `DOMAIN\user` or `user@DOMAIN` format.
-    ///
-    /// __Caveat:__ the connection is not encrypted by NTLM "sealing". For encryption, use
-    /// TLS. Additionally, no channel binding token is sent on a TLS connection, so some
-    /// strictly configured servers may refuse to work. If possible, use Kerberos/GSSAPI.
-    pub async fn sasl_ntlm_bind(&mut self, username: &str, password: &str) -> Result<LdapResult> {
-        const LDAP_RESULT_SASL_BIND_IN_PROGRESS: u32 = 14;
-
-        use sspi::{
-            builders::AcquireCredentialsHandleResult, AuthIdentity, AuthIdentityBuffers,
-            ClientRequestFlags, CredentialUse, DataRepresentation, Ntlm, OwnedSecurityBuffer,
-            SecurityBufferType, SecurityStatus, Sspi, SspiImpl, Username,
-        };
-
-        fn step(
-            ntlm: &mut Ntlm,
-            acq_creds: &mut AcquireCredentialsHandleResult<Option<AuthIdentityBuffers>>,
-            input: &[u8],
-        ) -> Result<Vec<u8>> {
-            let mut input = vec![OwnedSecurityBuffer::new(
-                input.to_vec(),
-                SecurityBufferType::Token,
-            )];
-            let mut output = vec![OwnedSecurityBuffer::new(
-                Vec::new(),
-                SecurityBufferType::Token,
-            )];
-            let mut builder = ntlm
-                .initialize_security_context()
-                .with_credentials_handle(&mut acq_creds.credentials_handle)
-                .with_context_requirements(ClientRequestFlags::ALLOCATE_MEMORY)
-                .with_target_data_representation(DataRepresentation::Native)
-                .with_input(&mut input)
-                .with_output(&mut output);
-            let result = ntlm
-                .initialize_security_context_impl(&mut builder)?
-                .resolve_to_result()?;
-            match result.status {
-                SecurityStatus::CompleteNeeded | SecurityStatus::CompleteAndContinue => {
-                    ntlm.complete_auth_token(&mut output)?
-                }
-                s => s,
-            };
-            Ok(output.swap_remove(0).buffer)
-        }
-
-        let mut ntlm = Ntlm::new();
-        let identity = AuthIdentity {
-            username: Username::parse(username).unwrap(),
-            password: password.to_string().into(),
-        };
-        let mut acq_creds = ntlm
-            .acquire_credentials_handle()
-            .with_credential_use(CredentialUse::Outbound)
-            .with_auth_data(&identity)
-            .execute(&mut ntlm)?;
-        let req = sasl_bind_req("GSS-SPNEGO", Some(&step(&mut ntlm, &mut acq_creds, &[])?));
-        let (res, _, token) = self.op_call(LdapOp::Single, req).await?;
-        if res.rc != LDAP_RESULT_SASL_BIND_IN_PROGRESS {
-            return Ok(res);
-        }
-        let token = match token.0 {
-            Some(token) => token,
-            _ => return Err(LdapError::NoNtlmChallengeToken),
-        };
-        if self.has_tls {
-            let mut cbt = Vec::from(&b"tls-server-end-point:"[..]);
-            if let Some(ref token) = self.tls_endpoint_token.as_ref() {
-                cbt.extend(token);
-                // temporary private extension, will see how best to incorporate into sspi-rs
-                // ntlm.set_channel_bindings(&cbt);
-            }
-        }
-        let req = sasl_bind_req(
-            "GSS-SPNEGO",
-            Some(&step(&mut ntlm, &mut acq_creds, &token)?),
-        );
-        Ok(self.op_call(LdapOp::Single, req).await?.0)
     }
 
     /// Perform a Search with the given base DN (`base`), scope, filter, and
@@ -781,7 +691,7 @@ impl Ldap {
             class: TagClass::Application,
             inner: (),
         });
-        self.op_call(LdapOp::Unbind, req).await.map(|_| ())
+        Ok(self.op_call(LdapOp::Unbind, req).await.map(|_| ())?)
     }
 
     /// Return the message ID of the last active operation. When the handle is initialized, this
@@ -801,15 +711,13 @@ impl Ldap {
             class: TagClass::Application,
             inner: msgid as i64,
         });
-        self.op_call(LdapOp::Abandon(msgid), req).await.map(|_| ())
+        Ok(self
+            .op_call(LdapOp::Abandon(msgid), req)
+            .await
+            .map(|_| ())?)
     }
 
     /// Check whether the underlying connection has been closed.
-    ///
-    /// This is an indirect check: it queries the status of the channel for communicating with
-    /// the connection structure, not the connection socket itself. The channel being open
-    /// does not mean there is bidirecional communication with the server; to check for that,
-    /// a round-trip operation (e.g., `WhoAmI`) would be necessary.
     pub fn is_closed(&mut self) -> bool {
         self.tx.is_closed()
     }
